@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이미지 복권 시스템</title>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; }
+        .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; max-width: 600px; margin: auto; }
+        .grid img { width: 80px; height: 80px; cursor: pointer; border-radius: 5px; border: 3px solid transparent; }
+        .selected { border: 3px solid red; }
+        #result { margin-top: 20px; font-size: 18px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>이미지 복권 선택 (4개)</h1>
+    <p>현재 참여 인원: <span id="participants">0</span>명</p>
+    <p>총 상금: <span id="totalMoney">0</span>원</p>
+    
+    <input type="text" id="mcId" placeholder="마인크래프트 아이디 입력" />
+    <div class="grid" id="imageGrid"></div>
+    <button onclick="submitSelection()">참여하기</button>
+    
+    <h2>당첨 결과</h2>
+    <p id="result"></p>
+
+    <h2>관리자 기능</h2>
+    <button onclick="adminDraw()">추첨 진행</button>
+    <p id="adminResult"></p>
+
+    <script>
+        const totalImages = 27;
+        let selectedImages = [];
+
+        const grid = document.getElementById("imageGrid");
+        for (let i = 1; i <= totalImages; i++) {
+            const img = document.createElement("img");
+            img.src = `images/${i}.png`;
+            img.dataset.imgId = i;
+            img.onclick = () => selectImage(img);
+            grid.appendChild(img);
+        }
+
+        function selectImage(img) {
+            let imgId = img.dataset.imgId;
+            if (selectedImages.includes(imgId)) {
+                selectedImages = selectedImages.filter(id => id !== imgId);
+                img.classList.remove("selected");
+            } else if (selectedImages.length < 4) {
+                selectedImages.push(imgId);
+                img.classList.add("selected");
+            }
+        }
+
+        function submitSelection() {
+            let mcId = document.getElementById("mcId").value.trim();
+            if (!mcId) {
+                alert("마인크래프트 아이디를 입력하세요!");
+                return;
+            }
+            if (selectedImages.length !== 4) {
+                alert("4개의 이미지를 선택하세요!");
+                return;
+            }
+
+            fetch('/lottery', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mc_id: mcId, images: selectedImages })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("participants").textContent = data.participants;
+                document.getElementById("totalMoney").textContent = (data.participants * 50000).toLocaleString();
+                alert("참여가 완료되었습니다!");
+            });
+        }
+
+        function adminDraw() {
+            fetch('/admin/draw', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("adminResult").innerHTML = 
+                    `당첨 이미지: ${data.lottery_images.map(id => `<img src="images/${id}.png" width="50">`).join(' ')}<br>
+                    당첨자: ${data.winners.length}명<br>
+                    당첨자 명단: ${data.winners.join(', ') || '없음'}`;
+            });
+        }
+
+        function updateParticipants() {
+            fetch('/status')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("participants").textContent = data.participants;
+                document.getElementById("totalMoney").textContent = (data.participants * 50000).toLocaleString();
+            });
+        }
+
+        updateParticipants();
+    </script>
+</body>
+</html>
